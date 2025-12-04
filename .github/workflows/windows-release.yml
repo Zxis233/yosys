@@ -1,0 +1,141 @@
+name: Windows Cross-Compile and Release
+
+# Trigger on tags that start with 'v' (e.g., v0.1.0) or manually
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag name for the release (e.g., v0.1.0)'
+        required: true
+        type: string
+
+jobs:
+  build-windows:
+    name: Cross-compile for Windows
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Yosys
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          persist-credentials: false
+
+      - name: Install MinGW cross-compiler and dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            mingw-w64 \
+            bison \
+            flex \
+            libffi-dev \
+            pkg-config \
+            tcl-dev \
+            zlib1g-dev \
+            gawk \
+            git \
+            make \
+            python3
+
+      - name: Create build directory
+        run: mkdir -p build
+
+      - name: Configure for Windows cross-compilation
+        run: |
+          cd build
+          cat > Makefile.conf <<EOF
+          CONFIG := msys2-64
+          PREFIX := /yosys
+          ENABLE_TCL := 1
+          ENABLE_ABC := 1
+          ENABLE_GLOB := 1
+          ENABLE_PLUGINS := 0
+          ENABLE_READLINE := 0
+          ENABLE_EDITLINE := 0
+          ENABLE_ZLIB := 1
+          ENABLE_COVER := 1
+          EOF
+
+      - name: Build Yosys for Windows
+        run: |
+          cd build
+          make -f ../Makefile -j$(nproc)
+
+      - name: Prepare release package
+        run: |
+          cd build
+          mkdir -p yosys-win64
+          cp yosys.exe yosys-win64/
+          cp yosys-*.exe yosys-win64/ 2>/dev/null || true
+          cp -r share yosys-win64/ 2>/dev/null || true
+
+          # Create README for the release
+          cat > yosys-win64/README.txt <<EOF
+          Yosys for Windows (64-bit)
+          ===========================
+
+          This is a cross-compiled version of Yosys for Windows.
+
+          To use:
+          1. Extract this archive
+          2. Add the directory to your PATH or run yosys.exe directly
+          3. Run 'yosys.exe' from command prompt or PowerShell
+
+          For more information, visit: https://github.com/YosysHQ/yosys
+          EOF
+
+      - name: Create archive
+        run: |
+          cd build
+          zip -r yosys-win64.zip yosys-win64/
+
+      - name: Get version/tag name
+        id: get_version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ inputs.tag_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: yosys-windows-${{ steps.get_version.outputs.VERSION }}
+          path: build/yosys-win64.zip
+          retention-days: 90
+
+      - name: Create Release
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.get_version.outputs.VERSION }}
+          name: Yosys ${{ steps.get_version.outputs.VERSION }}
+          body: |
+            ## Yosys Windows Release ${{ steps.get_version.outputs.VERSION }}
+
+            This release includes a cross-compiled Windows (64-bit) executable of Yosys.
+
+            ### Installation
+            1. Download `yosys-win64.zip`
+            2. Extract the archive
+            3. Run `yosys.exe` from the extracted directory
+
+            ### What's Included
+            - Yosys executable for Windows 64-bit
+            - Required share files
+            - ABC synthesis tool (if available)
+
+            ### Build Information
+            - Built with MinGW-w64 cross-compiler on Ubuntu
+            - Configured with TCL, ABC, GLOB, ZLIB, and COVER support
+
+            For more information and source code, visit the [Yosys GitHub repository](https://github.com/YosysHQ/yosys).
+          files: build/yosys-win64.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
