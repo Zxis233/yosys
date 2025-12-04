@@ -16,6 +16,8 @@ jobs:
   build-windows:
     name: Cross-compile for Windows
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Required for creating releases and uploading artifacts
 
     steps:
       - name: Checkout Yosys
