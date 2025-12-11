@@ -1,6 +1,6 @@
 name: Build Yosys for Linux Ubuntu
 
-# 手动触发编译 (Manual trigger for compilation)
+# Manual trigger for compilation
 on:
   workflow_dispatch:
 
