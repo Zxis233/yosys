@@ -8,6 +8,8 @@ jobs:
   build-linux-ubuntu:
     name: Build Yosys executable for Linux Ubuntu
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     env:
       CC: clang
     
