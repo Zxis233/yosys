@@ -15,7 +15,7 @@ jobs:
       - name: Checkout Yosys
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: true
           persist-credentials: false
       
       - name: Setup build environment
@@ -27,7 +27,7 @@ jobs:
       - name: Configure build
         shell: bash
         run: |
-          make config-clang
+          make config-$CC
       
       - name: Build Yosys
         shell: bash
