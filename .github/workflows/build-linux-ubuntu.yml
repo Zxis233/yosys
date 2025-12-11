@@ -1,0 +1,55 @@
+name: Build Yosys for Linux Ubuntu
+
+# Manual trigger for compilation
+on:
+  workflow_dispatch:
+
+jobs:
+  build-linux-ubuntu:
+    name: Build Yosys executable for Linux Ubuntu
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      CC: clang
+    
+    steps:
+      - name: Checkout Yosys
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          persist-credentials: false
+      
+      - name: Setup build environment
+        uses: ./.github/actions/setup-build-env
+        with:
+          runs-on: ubuntu-latest
+          get-build-deps: true
+      
+      - name: Configure build
+        shell: bash
+        run: |
+          make config-$CC
+      
+      - name: Build Yosys
+        shell: bash
+        run: |
+          make -j$procs
+      
+      - name: Verify build
+        shell: bash
+        run: |
+          ./yosys --version
+          ./yosys-config --build
+      
+      - name: Package build artifacts
+        shell: bash
+        run: |
+          tar -czf yosys-linux-ubuntu.tar.gz yosys yosys-* share/
+      
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: yosys-linux-ubuntu
+          path: yosys-linux-ubuntu.tar.gz
+          retention-days: 30
